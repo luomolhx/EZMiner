@@ -8,7 +8,7 @@ import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 
-import com.czqwq.EZMiner.core.founder.BasePositionFounder;
+import com.czqwq.EZMiner.utils.PosEncoding;
 
 import cpw.mods.fml.common.Loader;
 
@@ -97,18 +97,18 @@ public final class TinkersConstructLevelingBridge {
      */
     public static void markBeforeBlockBreak(EntityPlayerMP player, int x, int y, int z) {
         if (!TIC_LOADED) return;
-        pendingSmelt.put(BasePositionFounder.encodePos(x, y, z), player.getUniqueID());
+        pendingSmelt.put(PosEncoding.encode(x, y, z), player.getUniqueID());
     }
 
     /** Removes the pending entry for the given position. Idempotent. */
     public static void clearBlockBreak(int x, int y, int z) {
-        if (TIC_LOADED) pendingSmelt.remove(BasePositionFounder.encodePos(x, y, z));
+        if (TIC_LOADED) pendingSmelt.remove(PosEncoding.encode(x, y, z));
     }
 
     /** True when {@code (x, y, z)} was just marked for this exact player. */
     public static boolean isSmeltCandidate(EntityPlayerMP player, int x, int y, int z) {
         if (!TIC_LOADED) return false;
-        UUID owner = pendingSmelt.get(BasePositionFounder.encodePos(x, y, z));
+        UUID owner = pendingSmelt.get(PosEncoding.encode(x, y, z));
         return owner != null && owner.equals(player.getUniqueID());
     }
 

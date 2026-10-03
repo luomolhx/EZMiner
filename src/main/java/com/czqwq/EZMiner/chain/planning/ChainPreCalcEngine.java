@@ -21,8 +21,8 @@ import com.czqwq.EZMiner.chain.network.PacketCachedBlockSync;
 import com.czqwq.EZMiner.chain.planning.ChainPreCalcCache.CachedEntry;
 import com.czqwq.EZMiner.core.MinerConfig;
 import com.czqwq.EZMiner.core.MinerModeState;
-import com.czqwq.EZMiner.core.founder.BasePositionFounder;
 import com.czqwq.EZMiner.core.founder.DeterminingIdentical;
+import com.czqwq.EZMiner.utils.PosEncoding;
 
 import codechicken.lib.raytracer.RayTracer;
 
@@ -188,7 +188,7 @@ public final class ChainPreCalcEngine {
         fuzzyTypeClass = block.getClass();
 
         frontier.addLast(center);
-        long centerKey = BasePositionFounder.encodePos(bx, by, bz);
+        long centerKey = PosEncoding.encode(bx, by, bz);
         visited.add(centerKey);
         results.add(new Vector3i(bx, by, bz));
         // A new pre-calculation restarts the client-side list, so the next packet is a full one.
@@ -238,7 +238,7 @@ public final class ChainPreCalcEngine {
                             int cz = current.z + dz;
                             if (Math.abs(cz - center.z) > bigR) continue;
 
-                            long key = BasePositionFounder.encodePos(cx, cy, cz);
+                            long key = PosEncoding.encode(cx, cy, cz);
                             if (visited.contains(key)) continue;
 
                             checksThisTick++;

@@ -9,8 +9,6 @@ import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.filter.AbstractFilter;
 
 import com.czqwq.EZMiner.chain.lifecycle.ChainLifecycleService;
-import com.czqwq.EZMiner.chain.mode.ChainModeRegistry;
-import com.czqwq.EZMiner.chain.mode.ChainSubModeRegistry;
 import com.czqwq.EZMiner.chain.planning.ChainPlanningRuntimeFactory;
 import com.czqwq.EZMiner.chain.state.ChainStateService;
 import com.czqwq.EZMiner.network.NetworkMain;
@@ -47,8 +45,6 @@ public class EZMiner {
     public static final ParallelTick parallelTick = new ParallelTick();
     public static final ChainStateService chainStateService = new ChainStateService();
     public static final ChainLifecycleService chainLifecycleService = new ChainLifecycleService();
-    public static final ChainModeRegistry chainModeRegistry = new ChainModeRegistry();
-    public static final ChainSubModeRegistry chainSubModeRegistry = new ChainSubModeRegistry();
     public static final ChainPlanningRuntimeFactory chainPlanningRuntimeFactory = new ChainPlanningRuntimeFactory();
 
     /** True when the server sends a {@code PacketServerConfig} with {@code isOp=true}. Client-side only. */

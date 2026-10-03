@@ -24,8 +24,16 @@ import org.junit.Test;
  * <li>{@code smallRadius} — neighbour search cube half-size</li>
  * <li>{@code bigRadius} — maximum expansion radius from center</li>
  * <li>same-type matching — only blocks matching the center block are expanded</li>
- * <li>visited-set guarding via {@code encodePos} / {@link HashSet}</li>
+ * <li>visited-set guarding via {@code PosEncoding.encode} / {@link HashSet}</li>
  * </ul>
+ *
+ * <p>
+ * <strong>Caveat:</strong> the two algorithms below are inline copies, not the
+ * production implementations in {@link ChainPositionFounder} — those need a live
+ * {@code EntityPlayer} and world reads and cannot be loaded here. A change to either
+ * production algorithm must be mirrored into this file by hand; a regression in the
+ * production code will <em>not</em> fail this suite. (Contrast {@code EncodePosTest},
+ * which calls the real {@code PosEncoding.encode}.)
  */
 public class BfsConsistencyTest {
 
@@ -92,7 +100,7 @@ public class BfsConsistencyTest {
         }
     }
 
-    /** Encodes (x,y,z) into a single long, matching the real encodePos scheme. */
+    /** Encodes (x,y,z) into a single long, matching the real {@code PosEncoding.encode} scheme. */
     static long posKey(int x, int y, int z) {
         return ((long) (x + 30_000_000) << 38) | ((long) (y & 0xFFF) << 26) | (long) (z + 30_000_000);
     }

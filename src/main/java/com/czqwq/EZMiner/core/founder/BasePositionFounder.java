@@ -20,6 +20,7 @@ import com.czqwq.EZMiner.compat.WitcheryVampireBridge;
 import com.czqwq.EZMiner.core.MinerConfig;
 import com.czqwq.EZMiner.thread.Pauseable;
 import com.czqwq.EZMiner.thread.SearchWorkerPool;
+import com.czqwq.EZMiner.utils.PosEncoding;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -30,9 +31,9 @@ import it.unimi.dsi.fastutil.longs.LongSets;
  * collecting non-air/liquid/bedrock blocks harvestable by the player.
  *
  * <p>
- * Performance: visited set uses compact {@code long} keys ({@link #encodePos})
- * instead of {@code Vector3i} to avoid GC pressure. Player floor pos and sample block
- * are cached at construction time.
+ * Performance: visited set uses compact {@code long} keys
+ * ({@link PosEncoding#encode}) instead of {@code Vector3i} to avoid GC pressure.
+ * Player floor pos and sample block are cached at construction time.
  * </p>
  */
 public class BasePositionFounder extends Pauseable {
@@ -46,7 +47,8 @@ public class BasePositionFounder extends Pauseable {
     public LinkedBlockingQueue<Vector3i> positions;
 
     /**
-     * Dedup set using compact long keys from {@link #encodePos} — lock-free for multi-threaded search.
+     * Dedup set using compact long keys from {@link PosEncoding#encode} — lock-free for
+     * multi-threaded search.
      * Exactly one of {@link #visitedPositions}/{@link #visitedPrimitive} is non-null; both are private
      * so that every access (including subclass worker lambdas) goes through
      * {@link #markVisited}/{@link #isVisited}/{@link #clearVisited}.
@@ -469,7 +471,7 @@ public class BasePositionFounder extends Pauseable {
     }
 
     public void addResult(Vector3i pos) {
-        if (!markVisited(encodePos(pos.x, pos.y, pos.z))) return; // already visited
+        if (!markVisited(PosEncoding.encode(pos.x, pos.y, pos.z))) return; // already visited
         positions.offer(pos);
         curCount.incrementAndGet();
     }
@@ -488,7 +490,7 @@ public class BasePositionFounder extends Pauseable {
 
     /** Check visited set using compact long key — call BEFORE allocating a Vector3i. */
     protected boolean isVisited(int x, int y, int z) {
-        long key = encodePos(x, y, z);
+        long key = PosEncoding.encode(x, y, z);
         if (visitedPrimitive != null) return visitedPrimitive.contains(key);
         return visitedPositions.contains(key);
     }
@@ -497,14 +499,6 @@ public class BasePositionFounder extends Pauseable {
     protected void clearVisited() {
         if (visitedPrimitive != null) visitedPrimitive.clear();
         else visitedPositions.clear();
-    }
-
-    /**
-     * Compact coordinate encoding: x/z + 30M bias in 26 bits, y in 12 bits → single long.
-     * Bias avoids collisions from two's-complement negative coordinates.
-     */
-    public static long encodePos(int x, int y, int z) {
-        return ((long) (x + 30_000_000) << 38) | ((long) (y & 0xFFF) << 26) | (long) (z + 30_000_000);
     }
 
     /** @deprecated Use cached fields to avoid Vector3i allocation. */

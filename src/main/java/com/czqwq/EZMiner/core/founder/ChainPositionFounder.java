@@ -20,6 +20,7 @@ import com.czqwq.EZMiner.Config;
 import com.czqwq.EZMiner.compat.WitcheryVampireBridge;
 import com.czqwq.EZMiner.core.MinerConfig;
 import com.czqwq.EZMiner.thread.SearchWorkerPool;
+import com.czqwq.EZMiner.utils.PosEncoding;
 
 /**
  * Chain mode: priority-queue BFS flood-fill, same-type blocks only.
@@ -297,7 +298,7 @@ public class ChainPositionFounder extends BasePositionFounder {
                     // permanently and made the single- and multi-threaded searches disagree.
                     if (!player.worldObj.blockExists(cx, cy, cz)) continue;
                     // Atomic admission on the collecting thread (see method javadoc).
-                    if (!markVisited(encodePos(cx, cy, cz))) continue;
+                    if (!markVisited(PosEncoding.encode(cx, cy, cz))) continue;
                     out.add(new Vector3i(cx, cy, cz));
                 }
             }

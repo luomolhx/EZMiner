@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.world.World;
 
 import com.czqwq.EZMiner.EZMiner;
 import com.czqwq.EZMiner.chain.execution.CooldownTracker;
@@ -58,9 +59,19 @@ public class ChainLifecycleService {
         ToolSwapServerService.clear(playerUUID);
     }
 
-    public void onWorldUnload(Map<UUID, Manager> managers) {
-        EZMiner.chainStateService.onWorldUnload();
+    /**
+     * Stops the runtime of every player <em>currently in</em> the unloading world.
+     *
+     * <p>
+     * The world identity check is essential: {@code WorldEvent.Unload} fires for any
+     * world, including a non-overworld dimension going empty while other players are
+     * still mid-chain in the overworld. Without it, one dimension unloading would stop
+     * every player's chain — and, before the drop-safety change below, also discard
+     * their collected, not-yet-spawned drops.
+     */
+    public void onWorldUnload(World world, Map<UUID, Manager> managers) {
         for (Manager mgr : managers.values()) {
+            if (mgr.player == null || mgr.player.worldObj != world) continue;
             // The world is going away: do not spawn into it, and do not destroy what is
             // collected — the manager survives the unload, so the next key-release flush can
             // still deliver it once the world is available again.

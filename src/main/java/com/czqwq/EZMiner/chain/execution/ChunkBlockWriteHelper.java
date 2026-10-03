@@ -1,18 +1,13 @@
 package com.czqwq.EZMiner.chain.execution;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
-
-import org.joml.Vector3i;
 
 import com.czqwq.EZMiner.EZMiner;
 
@@ -25,8 +20,9 @@ import cpw.mods.fml.common.Loader;
  * <p>
  * Bypasses {@link World#setBlock} (and its per-block chunk lookup, neighbor
  * notification, and individual {@code S23PacketBlockChange} overhead) by writing
- * directly to the sub-chunk arrays. Groups positions by chunk so that chunk and
- * EBS references are resolved once per chunk per batch.
+ * directly to the sub-chunk arrays. Chunk and EBS references are resolved once
+ * per chunk by {@link ChunkCachedHarvester}, the stateful batch harvester that
+ * drives this helper.
  *
  * <p>
  * <strong>EndlessIDs safety:</strong> if EndlessIDs is loaded, its
@@ -86,54 +82,6 @@ public class ChunkBlockWriteHelper {
         CHUNK_IS_MODIFIED = isModified;
         CHUNK_HEIGHT_MAP = heightMap;
         CHUNK_HEIGHT_MAP_MINIMUM = heightMapMinimum;
-    }
-
-    /** Grouping of positions by chunk for batched processing. */
-    public static class ChunkBatch {
-
-        public final Chunk chunk;
-        public final World world;
-        /** (x, y, z) positions in world coordinates. */
-        public final List<Vector3i> positions = new ArrayList<>(64);
-        /** bitmask of X/Z columns touched within this chunk (for heightMap update). */
-        public final boolean[] touchedColumns = new boolean[256];
-
-        public ChunkBatch(Chunk chunk, World world) {
-            this.chunk = chunk;
-            this.world = world;
-        }
-
-        public void add(Vector3i pos) {
-            positions.add(pos);
-            touchedColumns[(pos.x & 15) | ((pos.z & 15) << 4)] = true;
-        }
-    }
-
-    /**
-     * Group a list of world positions by their containing chunk.
-     *
-     * @param positions block positions in world coordinates
-     * @param world     the world (must not be null)
-     * @return map of chunk coordinate key (encoded as {@code (long)chunkX << 32 | (chunkZ & 0xffffffffL)})
-     *         to ChunkBatch
-     */
-    public static Map<Long, ChunkBatch> groupByChunk(List<Vector3i> positions, World world) {
-        Map<Long, ChunkBatch> batches = new HashMap<>();
-        for (Vector3i pos : positions) {
-            int cx = pos.x >> 4;
-            int cz = pos.z >> 4;
-            long key = (long) cx << 32 | (cz & 0xffffffffL);
-            ChunkBatch batch = batches.get(key);
-            if (batch == null) {
-                if (!world.blockExists(pos.x, pos.y, pos.z)) continue;
-                Chunk chunk = world.getChunkFromChunkCoords(cx, cz);
-                if (chunk == null) continue;
-                batch = new ChunkBatch(chunk, world);
-                batches.put(key, batch);
-            }
-            batch.add(pos);
-        }
-        return batches;
     }
 
     /**
@@ -220,7 +168,8 @@ public class ChunkBlockWriteHelper {
      *
      * <p>
      * Caller gates this behind {@code Config.notifyNeighborsOnChainBreak}
-     * (default off) — it is the performance-expensive option.
+     * (default <strong>on</strong>) — it is the more expensive option, but the cost is
+     * surface-proportional rather than volume-proportional.
      *
      * @param world   server world being modified
      * @param removed the batch of removed positions with their old blocks

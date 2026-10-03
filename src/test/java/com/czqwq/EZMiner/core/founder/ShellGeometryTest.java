@@ -24,6 +24,14 @@ import org.junit.Test;
  *
  * <p>
  * Pure logic — no Minecraft dependencies.
+ *
+ * <p>
+ * <strong>Caveat:</strong> this test exercises an inline copy of the enumeration
+ * algorithm, not {@code BasePositionFounder.scanShellFaces} itself — the production
+ * method needs a live world and cannot be loaded here. A change to the production
+ * algorithm must be mirrored into this file by hand; a regression there will
+ * <em>not</em> fail this suite. (Contrast {@code EncodePosTest}, which calls the real
+ * {@code PosEncoding.encode}.)
  */
 public class ShellGeometryTest {
 

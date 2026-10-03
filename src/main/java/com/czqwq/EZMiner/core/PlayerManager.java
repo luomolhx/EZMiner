@@ -83,7 +83,7 @@ public class PlayerManager {
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
         if (event.world == null || event.world.isRemote) return;
-        EZMiner.chainLifecycleService.onWorldUnload(managers);
+        EZMiner.chainLifecycleService.onWorldUnload(event.world, managers);
     }
 
     @SubscribeEvent

@@ -38,12 +38,6 @@ public class ChainStateService {
         clearPlayerRuntime(playerUUID);
     }
 
-    public void onWorldUnload() {
-        for (ChainPlayerState state : stateMap.values()) {
-            state.clearRuntime();
-        }
-    }
-
     private void clearPlayerRuntime(UUID playerUUID) {
         ChainPlayerState state = stateMap.get(playerUUID);
         if (state != null) state.clearRuntime();

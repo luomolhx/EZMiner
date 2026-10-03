@@ -62,7 +62,7 @@ d6dbd51 引入 5 个实验性性能开关及配套实现。方向合理(减少�
 
 - ✅ `./gradlew spotlessApply build` 通过(Jabel + Mixin AP + checkstyle)
 - ✅ 全库 grep 确认无已删类/flag 的残留引用;`visitedPositions`/`visitedPrimitive` 仅存在于 `BasePositionFounder` 私有封装内
-- ⬜ 建议游戏内手测(见 docs/todo.md 引言):默认配置爆破无残棱、链挖中途松键线程即停、`usePrimitiveVisitedSet+MT` 整脉可挖、专用服 GUI 保存不重置
+- ⬜ 建议游戏内手测:默认配置爆破无残棱、链挖中途松键线程即停、`usePrimitiveVisitedSet+MT` 整脉可挖、专用服 GUI 保存不重置
 
 ## 六、遗留事项
 
