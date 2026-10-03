@@ -123,6 +123,9 @@ ezminer.message.chain.idle_countdown=EZMiner: No new blocks found. Auto-cancelli
 ezminer.message.chain.idle_cancel=EZMiner: Auto-cancelled — idle for %s s
 ezminer.message.chain.watchdog_timeout=EZMiner: Chain watchdog timeout — force cancelled. Is the chunk unloaded?
 ezminer.message.chain.error=EZMiner: Error while harvesting block at %s: %s
+ezminer.message.chain.stop.keyReleased=EZMiner: Stopped — chain key released; blocks=%s; time=%s
+ezminer.message.chain.stop.tool=EZMiner: Stopped — tool out of durability or cannot harvest; blocks=%s; time=%s
+ezminer.message.chain.stop.player=EZMiner: Stopped — player offline/dead/starving; blocks=%s; time=%s
 ezminer.message.special.minesweeper.marked=EZMiner: Mine flagged at (%s, %s, %s), distance=%s blocks
 ezminer.message.special.sudoku.filled=EZMiner: Sudoku cell (%s, %s) filled with %s
 

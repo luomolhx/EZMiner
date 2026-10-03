@@ -123,6 +123,9 @@ ezminer.message.chain.idle_countdown=EZMiner: 没有找到新方块，%s秒后�
 ezminer.message.chain.idle_cancel=EZMiner: 已自动取消 — 空闲超过%s秒
 ezminer.message.chain.watchdog_timeout=EZMiner: 连锁看门狗超时 — 已强制取消。区块是否已卸载？
 ezminer.message.chain.error=EZMiner: 挖掘方块 %s 时出错：%s
+ezminer.message.chain.stop.keyReleased=EZMiner: 已停止 — 连锁键已松开；方块数=%s；耗时=%s
+ezminer.message.chain.stop.tool=EZMiner: 已停止 — 工具耐久不足或无法采掘；方块数=%s；耗时=%s
+ezminer.message.chain.stop.player=EZMiner: 已停止 — 玩家离线/死亡/饥饿；方块数=%s；耗时=%s
 ezminer.message.special.minesweeper.marked=EZMiner: 已标记雷点 -> (%s, %s, %s), 距离=%s格
 ezminer.message.special.sudoku.filled=EZMiner: 数独单元格 (%s, %s) 已填入 %s
 

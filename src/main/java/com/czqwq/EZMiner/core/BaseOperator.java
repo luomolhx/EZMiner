@@ -60,6 +60,42 @@ public class BaseOperator {
     private long startTime;
     private int operatorCount = 0;
     private boolean stopRequested = false;
+    /** Why the current chain is stopping; drives the end-of-chain message. */
+    private StopReason stopReason = StopReason.COMPLETED;
+
+    /**
+     * Why a chain operation ended.
+     *
+     * <p>
+     * EZMiner aborts a chain for several unrelated reasons (tool about to break,
+     * player state, key release, idle timeout, watchdog). Reporting all of them as
+     * "chain complete" made a tool-durability abort indistinguishable from a chain
+     * that actually mined everything it found — the player saw a normal completion
+     * message and no hint that the tool was the limit.
+     */
+    public enum StopReason {
+
+        /** The founder finished scanning and the queue drained — a real completion. */
+        COMPLETED("ezminer.message.chain.done"),
+        /** The chain key was released before the queue drained. */
+        KEY_RELEASED("ezminer.message.chain.stop.keyReleased"),
+        /** The tool ran out of durability, could not harvest the target, or the player is starving. */
+        TOOL("ezminer.message.chain.stop.tool"),
+        /** The player went offline or died. */
+        PLAYER("ezminer.message.chain.stop.player"),
+        /** Already announced by its own message immediately before the stop. */
+        IDLE_TIMEOUT(null),
+        /** Already announced by its own message immediately before the stop. */
+        WATCHDOG(null);
+
+        /** Translation key, or {@code null} when this reason sends no message of its own. */
+        private final String messageKey;
+
+        StopReason(String messageKey) {
+            this.messageKey = messageKey;
+        }
+    }
+
     /**
      * Server tick when the last tool-break handoff request was sent to the client.
      * 0 = no handoff in progress. The operator waits up to
@@ -111,8 +147,12 @@ public class BaseOperator {
     public void operatorTask(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.START) return;
         // Guard: stop if chain key released OR player is no longer online/alive
-        if (!manager.isKeyPressed() || !isPlayerOnline()) {
-            unRegistry();
+        if (!manager.isKeyPressed()) {
+            unRegistry(StopReason.KEY_RELEASED);
+            return;
+        }
+        if (!isPlayerOnline()) {
+            unRegistry(StopReason.PLAYER);
             return;
         }
 
@@ -162,7 +202,7 @@ public class BaseOperator {
                     MessageUtils.serverSendPlayerMessage(
                         new ChatComponentTranslation("ezminer.message.chain.idle_cancel", totalTimeout),
                         manager.playerUUID);
-                    unRegistry();
+                    unRegistry(StopReason.IDLE_TIMEOUT);
                     return;
                 }
                 if (countdownSec != lastCountdownSecond && countdownSec <= Config.chainIdleCountdownSeconds) {
@@ -179,12 +219,12 @@ public class BaseOperator {
             MessageUtils.serverSendPlayerMessage(
                 new ChatComponentTranslation("ezminer.message.chain.watchdog_timeout"),
                 manager.playerUUID);
-            unRegistry();
+            unRegistry(StopReason.WATCHDOG);
             return;
         }
 
         if (canBreakPositions.isEmpty()) {
-            if (planningTask.isStopped()) unRegistry();
+            if (planningTask.isStopped()) unRegistry(StopReason.COMPLETED);
             return;
         }
 
@@ -198,8 +238,14 @@ public class BaseOperator {
         if (toolBreakHandoffTick != 0 && getServerTick() - toolBreakHandoffTick >= 1) {
             // After the first tick (the detection tick), pause harvesting.
             // The client needs server ticks to sync the inventory change.
-            if (!canOperate() || !isPlayerOnline()) {
-                unRegistry();
+            if (!isPlayerOnline()) {
+                unRegistry(StopReason.PLAYER);
+                return;
+            }
+            if (!canOperate()) {
+                // The handoff timed out without a usable replacement tool appearing —
+                // or the player state changed while we waited, hence the derived reason.
+                unRegistry(currentBlockReason());
                 return;
             }
             // Re-check: has the tool changed to a usable replacement? If so, resume.
@@ -211,8 +257,12 @@ public class BaseOperator {
             toolBreakHandoffTick = 0;
         }
 
-        if (!canOperate() || !isPlayerOnline()) {
-            unRegistry();
+        if (!isPlayerOnline()) {
+            unRegistry(StopReason.PLAYER);
+            return;
+        }
+        if (!canOperate()) {
+            unRegistry(currentBlockReason());
             return;
         }
 
@@ -230,17 +280,35 @@ public class BaseOperator {
             chainExecutor.executeBatch(canBreakPositions, perTick, this::processCandidate);
         }
         if (stopRequested) {
-            unRegistry();
+            unRegistry(stopReason);
             return;
         }
 
-        if (planningTask.isStopped() && canBreakPositions.isEmpty()) unRegistry();
+        if (planningTask.isStopped() && canBreakPositions.isEmpty()) unRegistry(StopReason.COMPLETED);
     }
 
     private boolean isPlayerOnline() {
         return playerMP != null && !playerMP.isDead
             && playerMP.worldObj != null
             && (manager.activeSession == null || playerMP.dimension == manager.activeSession.dimensionId);
+    }
+
+    /** Flags the batch loop to stop, recording why so the end-of-chain message is accurate. */
+    private void requestStop() {
+        stopRequested = true;
+        stopReason = currentBlockReason();
+    }
+
+    /**
+     * Derives the stop reason from the current player/tool state. Only called on a stopping
+     * path (at most once per chain), so the extra checks never reach the hot loop.
+     */
+    private StopReason currentBlockReason() {
+        if (!isPlayerOnline()) return StopReason.PLAYER;
+        if (!manager.isKeyPressed()) return StopReason.KEY_RELEASED;
+        if (playerMP.getFoodStats()
+            .getFoodLevel() <= 0) return StopReason.PLAYER;
+        return StopReason.TOOL;
     }
 
     private boolean canOperate() {
@@ -346,6 +414,7 @@ public class BaseOperator {
         countdownStartTime = 0;
         lastCountdownSecond = -1;
         toolBreakHandoffTick = 0;
+        stopReason = StopReason.COMPLETED;
         // The watchdog is deliberately NOT armed here. Arming at chain start made the 100-tick
         // (5 s) default fire while a large-radius search was still legitimately running, because
         // the check sits before the empty-queue early return below. It is armed by the first
@@ -361,19 +430,24 @@ public class BaseOperator {
             .register(this);
     }
 
-    public void unRegistry() {
+    /**
+     * Stops the chain operation and reports {@code reason} to the player.
+     *
+     * <p>
+     * Reasons that already announced themselves right before calling this
+     * ({@link StopReason#IDLE_TIMEOUT}, {@link StopReason#WATCHDOG}) carry no message key,
+     * so the player does not get a redundant second line.
+     */
+    public void unRegistry(StopReason reason) {
         // Record cooldown timestamp when the chain completes (not on emergency stop).
         // Creative players are handled inside CooldownTracker.recordUse.
         if (operatorCount > 0) {
             CooldownTracker.recordUse(playerMP);
         }
         long ms = System.currentTimeMillis() - startTime;
-        if (manager.pConfig.useChainDoneMessage) {
+        if (manager.pConfig.useChainDoneMessage && reason.messageKey != null) {
             MessageUtils.serverSendPlayerMessage(
-                new ChatComponentTranslation(
-                    "ezminer.message.chain.done",
-                    operatorCount,
-                    TimeFormatUtils.formatElapsedServer(ms)),
+                new ChatComponentTranslation(reason.messageKey, operatorCount, TimeFormatUtils.formatElapsedServer(ms)),
                 manager.playerUUID);
         }
         // Reset client-side chain count and elapsed time display
@@ -426,7 +500,7 @@ public class BaseOperator {
 
     private boolean processCandidate(Vector3i pos) {
         if (!canOperate() || !isPlayerOnline()) {
-            stopRequested = true;
+            requestStop();
             return false;
         }
         // Tool-break handoff has just been requested: stop processing further
@@ -444,7 +518,7 @@ public class BaseOperator {
                     int meta = playerMP.worldObj.getBlockMetadata(pos.x, pos.y, pos.z);
                     if (!block.canHarvestBlock(playerMP, meta)
                         && !WitcheryVampireBridge.canHarvestWithBareHands(playerMP)) {
-                        stopRequested = true;
+                        requestStop();
                         return false;
                     }
                 }
@@ -480,7 +554,7 @@ public class BaseOperator {
         Vector3i pos;
         while (harvested < perTick && (pos = canBreakPositions.poll()) != null) {
             if (!canOperate() || !isPlayerOnline()) {
-                stopRequested = true;
+                requestStop();
                 break;
             }
             // Tool-break handoff has just been requested: stop mining this tick
@@ -500,7 +574,7 @@ public class BaseOperator {
                         int meta = playerMP.worldObj.getBlockMetadata(pos.x, pos.y, pos.z);
                         if (!block.canHarvestBlock(playerMP, meta)
                             && !WitcheryVampireBridge.canHarvestWithBareHands(playerMP)) {
-                            stopRequested = true;
+                            requestStop();
                             break;
                         }
                     }
@@ -558,7 +632,7 @@ public class BaseOperator {
         Vector3i pos;
         while (harvested < perTick && (pos = canBreakPositions.poll()) != null) {
             if (!canOperate() || !isPlayerOnline()) {
-                stopRequested = true;
+                requestStop();
                 break;
             }
             // Tool-break handoff has just been requested: stop mining this tick
@@ -577,7 +651,7 @@ public class BaseOperator {
                         int meta = playerMP.worldObj.getBlockMetadata(pos.x, pos.y, pos.z);
                         if (!block.canHarvestBlock(playerMP, meta)
                             && !WitcheryVampireBridge.canHarvestWithBareHands(playerMP)) {
-                            stopRequested = true;
+                            requestStop();
                             break;
                         }
                     }
