@@ -1,7 +1,7 @@
 
 elytraModpackVersion {
     // 在这配置的gtnh版本 用于自动拉取依赖版本
-    gtnhVersion = "2.9.0-beta-3"
+    gtnhVersion = "2.9.0"
     // 是否不缓存拉取的依赖清单文件
     manifestNoCache = false
     // 是否自动为输出的jar添加 `gtnhVersion` 后缀
@@ -24,8 +24,14 @@ dependencies {
     // runtime
     runtimeOnlyNonPublishable(gtnhDev("InGame-Info-XML"))
     runtimeOnlyNonPublishable(gtnhDev("VisualProspecting"))
+    // Navigator 由 VisualProspecting 传递引入（解析到的版本可能落后于正式包），显式钉到正式包
+    // GTNH 2.9.0 所用的 1.1.10：1.1.10 + JM 6.0.8 是该包实机验证过的组合。
+    runtimeOnlyNonPublishable('com.github.GTNewHorizons:Navigator:1.1.10:dev')
 
-    runtimeOnlyNonPublishable(rfg.deobf('maven.modrinth:journeymap:5.2.16'))
+    // JourneyMap 用 GTNH 分支的 6.0.8（与正式包 GTNH 2.9.0 内一致，CF 32274:9049794）。
+    // 不能用 5.2.16：Navigator 检测到 JM5 会走 v5 late mixin，其 @Shadow 的 Fullscreen.buttonTopo
+    // 在 5.2.16 的 Fullscreen 里不存在，mixin apply 失败后该类一加载就 NoClassDefFoundError。
+    runtimeOnlyNonPublishable(deobfCurse('journeymap-32274:9049794'))
     //runtimeOnlyNonPublishable rfg.deobf(files("libs/journeymap-1.7.10-5.2.10-fairplay.jar"))
     runtimeOnlyNonPublishable rfg.deobf(files("libs/spark-1.10.19.jar"))
     runtimeOnlyNonPublishable rfg.deobf(files("libs/extrautilities-1.2.12.jar"))
